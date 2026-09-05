@@ -14,16 +14,23 @@
 // --- Données de démonstration ----------------------------------------
 
 
-interface Film {
- id: number
- titre: string 
- annee: number
- genres: string[]
- note: number[]
- statut: string
+/** Union litterale : impossible d'ecrire "Vu", "vue" ou "a voir". */
+export type StatutFilm = "vu" | "a_voir" | "abandonne";
+
+export interface Film {
+  readonly id: number;
+  titre: string;
+  annee: number;
+  genres: string[];
+  note: number;
+  statut: StatutFilm;
 }
 
-export const FILMS = [
+/** Types derives : on ne recopie jamais une interface a la main. */
+export type NouveauFilm = Omit<Film, "id">;
+export type MajFilm = Partial<Omit<Film, "id">>;
+
+export const FILMS: Film[] = [
   { id: 1, titre: "Alien", annee: 1979, genres: ["SF", "Horreur"], note: 8.5, statut: "vu" },
   { id: 2, titre: "Blade Runner", annee: 1982, genres: ["SF", "Thriller"], note: 8.1, statut: "vu" },
   { id: 3, titre: "Arrival", annee: 2016, genres: ["SF", "Drame"], note: 7.9, statut: "a_voir" },
@@ -75,7 +82,8 @@ export function trierPar<T>(liste: T[], cle: keyof T): T[]{
 // --- 5. Un paramètre optionnel jamais vérifié -------------------------
 // Appelée sans genre, cette fonction filtre sur `undefined`.
 
-export function filtrerParGenre(liste: Film[], genre?: string ): Film {
+export function filtrerParGenre(liste: Film[], genre?: string): Film[] {
+  if(!genre) return liste;
   return liste.filter((film) => film.genres.includes(genre));
 }
 
@@ -87,22 +95,38 @@ export function estVu(film: Film): boolean {
   return film.statut === "vu";
 }
 
-export function libelleStatut(film: Film): string{
-  if (film.statut === "vu") return "Déjà vu";
-  if (film.statut === "a_voir") return "À voir";
-  if (film.statut === "abandonne") return "Abandonné";
-  return "Statut inconnu";
+export function libelleStatut(film: Film): string {
+  switch (film.statut) {
+    case "vu":
+      return "Deja vu";
+    case "a_voir":
+      return "A voir";
+    case "abandonne":
+      return "Abandonne";
+    default: {
+      // si une valeur est ajoutee a StatutFilm sans etre traitee ici,
+      // cette ligne ne compile plus.
+      const jamais: never = film.statut;
+      return jamais;
+    }
+  }
 }
 
 // --- 7. Une valeur venue de l'extérieur --------------------------------
 // localStorage.getItem renvoie null quand la clé n'existe pas.
 
-export function chargerFavoris() {
+export function chargerFavoris(): number[] {
   const brut = localStorage.getItem("favoris");
-  return JSON.parse(brut);
+  if (brut === null) return [];
+
+  // JSON.parse renvoie 'any' : on le range dans 'unknown' pour etre
+  // oblige de prouver sa forme avant de s'en servir.
+  const donnees: unknown = JSON.parse(brut);
+  if (!Array.isArray(donnees)) return [];
+  return donnees.filter((valeur): valeur is number => typeof valeur === "number");
 }
 
-export function enregistrerFavoris(favoris) {
+export function enregistrerFavoris(favoris: number[]): void {
   localStorage.setItem("favoris", JSON.stringify(favoris));
 }
 
@@ -110,7 +134,7 @@ export function enregistrerFavoris(favoris) {
 // On veut pouvoir modifier un ou plusieurs champs d'un film, sans avoir
 // à tous les repasser. Quel type décrit « quelques champs de Film » ?
 
-export function mettreAJour(film, modifications) {
+export function mettreAJour(film: Film, modifications: MajFilm): Film {
   return { ...film, ...modifications };
 }
 
@@ -120,7 +144,7 @@ export function mettreAJour(film, modifications) {
 
 let prochainId = 100;
 
-export function creer(nouveauFilm) {
+export function creer(nouveauFilm: NouveauFilm): Film {
   return { id: prochainId++, ...nouveauFilm };
 }
 
@@ -128,7 +152,7 @@ export function creer(nouveauFilm) {
 // Cette fonction modifie l'objet reçu au lieu d'en renvoyer un nouveau.
 // Le typage ne l'interdira pas — mais `readonly` peut aider.
 
-export function ajouterNote(film, nouvelleNote) {
-  film.note = (film.note + nouvelleNote) / 2;
-  return film;
+export function ajouterNote(film: Readonly<Film>, nouvelleNote: number): Film {
+  // Readonly interdit 'film.note = ...' : on renvoie un nouvel objet.
+  return { ...film, note: (film.note + nouvelleNote) / 2 };
 }
